@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import LogTable from '@/components/LogTable'
-import { Download, Users, TrendingUp, Calendar, FileSpreadsheet, Trash2 } from 'lucide-react'
+import { Download, Users, TrendingUp, Calendar, FileSpreadsheet, Trash2, Clock } from 'lucide-react'
 
 import Papa from 'papaparse'
 
@@ -16,6 +16,8 @@ export default function ManagerDashboard() {
     const [mounted, setMounted] = useState(false)
 
     const [weeklyHours, setWeeklyHours] = useState('0.00')
+    const [monthlyHours, setMonthlyHours] = useState('0.00')
+    const [totalHours, setTotalHours] = useState('0.00')
 
     useEffect(() => {
         setMounted(true)
@@ -24,38 +26,45 @@ export default function ManagerDashboard() {
 
     useEffect(() => {
         if (logs.length > 0) {
-            calculateWeeklyHours()
+            calculateStats()
         }
     }, [logs])
 
-    const calculateWeeklyHours = () => {
-        // Strict Monday-Sunday Week Cycle
-        // Week starts Monday 12:00 AM (00:00). Resets Sunday Midnight (end of Sunday).
+    const calculateStats = () => {
         const now = new Date()
-        const dayOfWeek = now.getDay() // 0 (Sun) - 6 (Sat)
-
-        // Calculate days to subtract to get to the most recent Monday
-        // Monday (1) -> subtract 0 days
-        // Tuesday (2) -> subtract 1 day
-        // Sunday (0) -> subtract 6 days
+        const dayOfWeek = now.getDay()
         const daysSinceMonday = (dayOfWeek + 6) % 7
 
-        const startOfWeek = new Date(now)
-        startOfWeek.setDate(now.getDate() - daysSinceMonday)
-        startOfWeek.setHours(0, 0, 0, 0) // Monday 12:00 AM
+        const weekStart = new Date(now)
+        weekStart.setDate(now.getDate() - daysSinceMonday)
+        weekStart.setHours(0, 0, 0, 0)
 
-        const totalMs = logs.reduce((acc, log) => {
-            const logDate = new Date(log.startTime)
-            if (logDate >= startOfWeek) {
-                const start = logDate.getTime()
-                const end = log.endTime ? new Date(log.endTime).getTime() : new Date().getTime()
-                return acc + (end - start)
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+        monthStart.setHours(0, 0, 0, 0)
+
+        let weeklyMs = 0
+        let monthlyMs = 0
+        let totalMs = 0
+
+        logs.forEach(log => {
+            const start = new Date(log.startTime).getTime()
+            const end = log.endTime ? new Date(log.endTime).getTime() : new Date().getTime()
+            const duration = end - start
+
+            totalMs += duration
+
+            if (start >= weekStart.getTime()) {
+                weeklyMs += duration
             }
-            return acc
-        }, 0)
 
-        const hours = (totalMs / (1000 * 60 * 60)).toFixed(2)
-        setWeeklyHours(hours)
+            if (start >= monthStart.getTime()) {
+                monthlyMs += duration
+            }
+        })
+
+        setWeeklyHours((weeklyMs / (1000 * 60 * 60)).toFixed(2))
+        setMonthlyHours((monthlyMs / (1000 * 60 * 60)).toFixed(2))
+        setTotalHours((totalMs / (1000 * 60 * 60)).toFixed(2))
     }
 
     const fetchData = async () => {
@@ -157,6 +166,7 @@ export default function ManagerDashboard() {
     }
 
     const exportCSV = () => {
+        // ... (keep same)
         const csvData = logs.map((log: any) => ({
             Employee: log.user.name,
             Date: new Date(log.startTime).toLocaleDateString(),
@@ -204,7 +214,7 @@ export default function ManagerDashboard() {
                 </div>
 
                 {/* Team Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="card p-6 flex items-center gap-4">
                         <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
                             <Users className="w-6 h-6" />
@@ -219,17 +229,26 @@ export default function ManagerDashboard() {
                             <TrendingUp className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-sm text-slate-400">Weekly Hours (Mon-Sun)</p>
-                            <p className="text-xl font-bold text-white">{weeklyHours} hours</p>
+                            <p className="text-sm text-slate-400">Weekly (Mon-Sun)</p>
+                            <p className="text-xl font-bold text-white">{weeklyHours} h</p>
+                        </div>
+                    </div>
+                    <div className="card p-6 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400">
+                            <Calendar className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p className="text-sm text-slate-400">Monthly Hours</p>
+                            <p className="text-xl font-bold text-white">{monthlyHours} h</p>
                         </div>
                     </div>
                     <div className="card p-6 flex items-center gap-4">
                         <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400">
-                            <FileSpreadsheet className="w-6 h-6" />
+                            <Clock className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-sm text-slate-400">Pending Reviews</p>
-                            <p className="text-xl font-bold text-white">5 entries</p>
+                            <p className="text-sm text-slate-400">Total Hours</p>
+                            <p className="text-xl font-bold text-white">{totalHours} h</p>
                         </div>
                     </div>
                 </div>
@@ -258,7 +277,12 @@ export default function ManagerDashboard() {
                                         </div>
                                         <div>
                                             <p className="text-sm font-bold text-white">{employee.name}</p>
-                                            <p className="text-xs text-slate-500">{employee.email}</p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-xs text-slate-500">{employee.email}</p>
+                                                <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                                    {employee.totalHours || '0.00'} h
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
 
