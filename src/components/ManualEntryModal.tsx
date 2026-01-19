@@ -35,9 +35,14 @@ export default function ManualEntryModal({ isOpen, onClose, onSave }: { isOpen: 
             if (res.ok) {
                 onSave()
                 onClose()
+            } else {
+                const errorData = await res.json()
+                alert(`Failed to save entry: ${errorData.error || 'Unknown error'}`)
+                console.error('Save failed:', errorData)
             }
         } catch (err) {
-            console.error(err)
+            console.error('Error submitting form:', err)
+            alert('An error occurred. Please check your connection and try again.')
         } finally {
             setLoading(false)
         }

@@ -17,7 +17,7 @@ export async function POST(req: Request) {
 
         const entry = await prisma.timeEntry.create({
             data: {
-                userId: session.userId,
+                userId: session.id,
                 startTime: new Date(startTime),
                 endTime: new Date(endTime),
                 description,
