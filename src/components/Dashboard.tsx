@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Play, Square, AlertCircle, Clock, Calendar, CheckCircle2, Plus, Filter, X } from 'lucide-react'
-import { formatDuration } from '@/lib/utils'
+import { formatDuration, getCDTStartOfCurrentWeek, getCDTStartOfToday, getCDTStartOfMonth } from '@/lib/utils'
 import ManualEntryModal from '@/components/ManualEntryModal'
 
 export default function DashboardPage() {
@@ -36,20 +36,9 @@ export default function DashboardPage() {
     }, [])
 
     const calculateStats = (entries: any[]) => {
-        const now = new Date()
-        const todayStart = new Date(now)
-        todayStart.setHours(0, 0, 0, 0)
-
-        // Calculate start of week (Monday)
-        const dayOfWeek = now.getDay() // 0-6 (Sun-Sat)
-        const daysSinceMonday = (dayOfWeek + 6) % 7
-        const weekStart = new Date(now)
-        weekStart.setDate(now.getDate() - daysSinceMonday)
-        weekStart.setHours(0, 0, 0, 0)
-
-        // Calculate start of month
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-        monthStart.setHours(0, 0, 0, 0)
+        const weekStart = getCDTStartOfCurrentWeek()
+        const todayStart = getCDTStartOfToday()
+        const monthStart = getCDTStartOfMonth()
 
         let weeklyMs = 0
         let dailyMs = 0
@@ -57,7 +46,7 @@ export default function DashboardPage() {
 
         entries.forEach(entry => {
             const start = new Date(entry.startTime).getTime()
-            const end = entry.endTime ? new Date(entry.endTime).getTime() : now.getTime()
+            const end = entry.endTime ? new Date(entry.endTime).getTime() : new Date().getTime()
             const duration = end - start
 
             if (start >= weekStart.getTime()) {

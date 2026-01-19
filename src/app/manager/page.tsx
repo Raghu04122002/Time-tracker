@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import LogTable from '@/components/LogTable'
 import { Download, Users, TrendingUp, Calendar, FileSpreadsheet, Trash2, Clock } from 'lucide-react'
+import { getCDTStartOfCurrentWeek, getCDTStartOfMonth } from '@/lib/utils'
 
 import Papa from 'papaparse'
 
@@ -30,17 +31,10 @@ export default function ManagerDashboard() {
         }
     }, [logs])
 
+
     const calculateStats = () => {
-        const now = new Date()
-        const dayOfWeek = now.getDay()
-        const daysSinceMonday = (dayOfWeek + 6) % 7
-
-        const weekStart = new Date(now)
-        weekStart.setDate(now.getDate() - daysSinceMonday)
-        weekStart.setHours(0, 0, 0, 0)
-
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-        monthStart.setHours(0, 0, 0, 0)
+        const weekStart = getCDTStartOfCurrentWeek()
+        const monthStart = getCDTStartOfMonth()
 
         let weeklyMs = 0
         let monthlyMs = 0
