@@ -1,7 +1,35 @@
 'use client'
 
+import { useState } from 'react'
+
 import { formatDate, formatTime, formatDuration } from '@/lib/utils'
 import { Calendar, Clock, FileText, ChevronRight, Trash2 } from 'lucide-react'
+
+const ExpandableDescription = ({ text }: { text: string | null }) => {
+    const [isExpanded, setIsExpanded] = useState(false)
+
+    if (!text) return <span className="text-slate-500 italic">No description provided</span>
+
+    return (
+        <div
+            onClick={() => setIsExpanded(!isExpanded)}
+            className={`cursor-pointer group relative ${isExpanded ? '' : ''}`}
+            title={isExpanded ? "Click to collapse" : "Click to expand"}
+        >
+            <p className={`text-sm text-slate-400 transition-all ${isExpanded
+                ? 'whitespace-pre-wrap'
+                : 'line-clamp-2 italic hover:text-slate-300'
+                }`}>
+                {text}
+            </p>
+            {!isExpanded && text.length > 50 && (
+                <span className="text-[10px] text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-4 left-0">
+                    Click to read more
+                </span>
+            )}
+        </div>
+    )
+}
 
 export default function LogTable({ logs, onDelete }: { logs: any[], onDelete?: (id: string) => void }) {
     if (!Array.isArray(logs) || logs.length === 0) {
@@ -21,7 +49,7 @@ export default function LogTable({ logs, onDelete }: { logs: any[], onDelete?: (
                             <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Date</th>
                             <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Entry/Exit</th>
                             <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Duration</th>
-                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Work Description</th>
+                            <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider w-1/3">Work Description</th>
                             <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Type</th>
                             <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Actions</th>
                         </tr>
@@ -59,15 +87,13 @@ export default function LogTable({ logs, onDelete }: { logs: any[], onDelete?: (
                                             {log.endTime ? formatDuration(duration) : 'Active'}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 max-w-md">
+                                    <td className="px-6 py-4 max-w-md align-top">
                                         <div className="flex items-start gap-2">
                                             <FileText className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
-                                            <p className="text-sm text-slate-400 line-clamp-2 italic">
-                                                {log.description || 'No description provided'}
-                                            </p>
+                                            <ExpandableDescription text={log.description} />
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-6 py-4 align-top">
                                         {log.isManual ? (
                                             <span className="text-[10px] font-bold uppercase tracking-tight px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
                                                 Manual
@@ -78,7 +104,7 @@ export default function LogTable({ logs, onDelete }: { logs: any[], onDelete?: (
                                             </span>
                                         )}
                                     </td>
-                                    <td className="px-6 py-4 text-right">
+                                    <td className="px-6 py-4 text-right align-top">
                                         {onDelete && (
                                             <button
                                                 type="button"
