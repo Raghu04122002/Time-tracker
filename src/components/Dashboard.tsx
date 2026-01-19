@@ -24,7 +24,12 @@ export default function DashboardPage() {
     // Filter State
     const [startDate, setStartDate] = useState('')
     const [endDate, setEndDate] = useState('')
-    const [filteredTotal, setFilteredTotal] = useState<string | null>(null)
+    const [isFiltered, setIsFiltered] = useState(false)
+
+    // Filtered Stats
+    const [filteredTotal, setFilteredTotal] = useState('0.0')
+    const [filteredAvg, setFilteredAvg] = useState('0.0')
+    const [filteredDays, setFilteredDays] = useState(0)
 
     useEffect(() => {
         fetchData()
@@ -98,7 +103,6 @@ export default function DashboardPage() {
             const query = new URLSearchParams()
             if (customStart && customEnd) {
                 query.append('startDate', new Date(customStart).toISOString())
-                // Set end date to end of day
                 const eDate = new Date(customEnd)
                 eDate.setHours(23, 59, 59, 999)
                 query.append('endDate', eDate.toISOString())
@@ -111,18 +115,28 @@ export default function DashboardPage() {
             // If filtering, calculate total for this range
             if (customStart && customEnd) {
                 let totalMs = 0
+                const uniqueDays = new Set()
+
                 entries.forEach((entry: any) => {
                     const start = new Date(entry.startTime).getTime()
                     const end = entry.endTime ? new Date(entry.endTime).getTime() : new Date().getTime()
                     totalMs += (end - start)
+
+                    const dayStr = new Date(entry.startTime).toDateString()
+                    uniqueDays.add(dayStr)
                 })
-                setFilteredTotal((totalMs / (1000 * 60 * 60)).toFixed(1))
+
+                const totalHours = totalMs / (1000 * 60 * 60)
+                setFilteredTotal(totalHours.toFixed(1))
+                setFilteredDays(uniqueDays.size)
+                setFilteredAvg(uniqueDays.size > 0 ? (totalHours / uniqueDays.size).toFixed(1) : '0.0')
+                setIsFiltered(true)
             } else {
                 // Normal Load: Update everything
                 const active = entries.find((e: any) => !e.endTime)
                 setActiveEntry(active)
                 calculateStats(entries)
-                setFilteredTotal(null)
+                setIsFiltered(false)
             }
 
             setLoading(false)
@@ -141,7 +155,7 @@ export default function DashboardPage() {
     const clearFilter = () => {
         setStartDate('')
         setEndDate('')
-        setFilteredTotal(null)
+        setIsFiltered(false)
         setLoading(true)
         fetchData()
     }
@@ -194,15 +208,14 @@ export default function DashboardPage() {
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Main Clock Control */}
+                {/* Main Content */}
                 <div className="lg:col-span-2 space-y-8">
+                    {/* Timer Card */}
                     <div className="card p-12 flex flex-col items-center justify-center text-center relative overflow-hidden group">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-emerald-500 to-blue-500" />
-
                         <div className={`text-7xl font-mono font-bold mb-8 transition-colors ${activeEntry ? 'text-blue-400' : 'text-slate-600'}`}>
                             {formatDuration(timer)}
                         </div>
-
                         {activeEntry ? (
                             <button
                                 onClick={() => setShowClockOutModal(true)}
@@ -222,7 +235,6 @@ export default function DashboardPage() {
                                 Clock In
                             </button>
                         )}
-
                         {activeEntry && (
                             <div className="mt-8 flex items-center gap-2 text-emerald-400 animate-pulse">
                                 <CheckCircle2 className="w-4 h-4" />
@@ -231,55 +243,109 @@ export default function DashboardPage() {
                         )}
                     </div>
 
-                    {/* Quick Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="card p-6 flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
-                                <Clock className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-slate-400">Weekly</p>
-                                <p className="text-xl font-bold text-white">{weeklyTotal} h</p>
-                            </div>
-                        </div>
-                        <div className="card p-6 flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                                <Calendar className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-slate-400">Daily</p>
-                                <p className="text-xl font-bold text-white">{dailyTotal} h</p>
-                            </div>
-                        </div>
-                        <div className="card p-6 flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400">
-                                <Calendar className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-slate-400">Monthly</p>
-                                <p className="text-xl font-bold text-white">{monthlyTotal} h</p>
-                            </div>
+                    {/* Filter Controls */}
+                    <div className="flex items-end justify-between gap-4">
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                            <Clock className="w-5 h-5 text-blue-400" />
+                            {isFiltered ? 'Filtered Stats' : 'Overview'}
+                        </h3>
+                        <div className="flex items-center gap-2 bg-slate-800/50 p-1.5 rounded-lg border border-slate-700/50">
+                            <input
+                                type="date"
+                                className="bg-transparent text-slate-300 text-sm px-2 py-1 outline-none border-none"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                            />
+                            <span className="text-slate-600 text-sm">to</span>
+                            <input
+                                type="date"
+                                className="bg-transparent text-slate-300 text-sm px-2 py-1 outline-none border-none"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                            />
+                            <div className="w-px h-4 bg-slate-700 mx-1" />
+                            <button
+                                onClick={handleApplyFilter}
+                                disabled={!startDate || !endDate}
+                                className="p-1 rounded hover:bg-blue-500/20 text-blue-400 disabled:opacity-30 disabled:hover:bg-transparent"
+                            >
+                                <Filter className="w-4 h-4" />
+                            </button>
+                            {isFiltered && (
+                                <button
+                                    onClick={clearFilter}
+                                    className="p-1 rounded hover:bg-red-500/20 text-red-400"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
                         </div>
                     </div>
 
-                    {/* Filter Result Card (Only shows when filtered) */}
-                    {filteredTotal !== null && (
-                        <div className="card p-6 bg-blue-500/10 border-blue-500/20 flex items-center justify-between animate-fade-in">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400">
-                                    <Filter className="w-6 h-6" />
+                    {/* Stats Grid - Dynamic Content */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {isFiltered ? (
+                            <>
+                                <div className="card p-6 flex items-center gap-4 border-blue-500/30 bg-blue-500/5">
+                                    <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+                                        <Clock className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-slate-400">Total Hours</p>
+                                        <p className="text-xl font-bold text-white">{filteredTotal} h</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-sm text-slate-400">Selected Range Total</p>
-                                    <p className="text-xs text-slate-500">{startDate} to {endDate}</p>
+                                <div className="card p-6 flex items-center gap-4 border-blue-500/30 bg-blue-500/5">
+                                    <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400">
+                                        <Calendar className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-slate-400">Daily Avg</p>
+                                        <p className="text-xl font-bold text-white">{filteredAvg} h</p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-3xl font-bold text-white">{filteredTotal}</p>
-                                <p className="text-xs text-slate-400">hours</p>
-                            </div>
-                        </div>
-                    )}
+                                <div className="card p-6 flex items-center gap-4 border-blue-500/30 bg-blue-500/5">
+                                    <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                                        <CheckCircle2 className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-slate-400">Days Worked</p>
+                                        <p className="text-xl font-bold text-white">{filteredDays} days</p>
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="card p-6 flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+                                        <Clock className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-slate-400">Weekly</p>
+                                        <p className="text-xl font-bold text-white">{weeklyTotal} h</p>
+                                    </div>
+                                </div>
+                                <div className="card p-6 flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                                        <Calendar className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-slate-400">Daily</p>
+                                        <p className="text-xl font-bold text-white">{dailyTotal} h</p>
+                                    </div>
+                                </div>
+                                <div className="card p-6 flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400">
+                                        <Calendar className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-slate-400">Monthly</p>
+                                        <p className="text-xl font-bold text-white">{monthlyTotal} h</p>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
 
                 {/* Sidebar / Info */}
@@ -292,51 +358,6 @@ export default function DashboardPage() {
                         <p className="text-sm text-slate-400 leading-relaxed">
                             {user?.currentTask || 'No task assigned yet. Please check back later or update your objectives.'}
                         </p>
-                    </div>
-
-                    {/* Filter Card */}
-                    <div className="card p-6">
-                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                            <Filter className="w-5 h-5 text-blue-400" />
-                            Analyze Hours
-                        </h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs text-slate-400 block mb-1">Start Date</label>
-                                <input
-                                    type="date"
-                                    className="input-field py-2 text-sm"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs text-slate-400 block mb-1">End Date</label>
-                                <input
-                                    type="date"
-                                    className="input-field py-2 text-sm"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                />
-                            </div>
-                            <div className="flex gap-2 pt-2">
-                                <button
-                                    onClick={handleApplyFilter}
-                                    disabled={!startDate || !endDate}
-                                    className="flex-1 btn-primary py-2 text-sm disabled:opacity-50"
-                                >
-                                    Apply
-                                </button>
-                                {filteredTotal !== null && (
-                                    <button
-                                        onClick={clearFilter}
-                                        className="btn-outline py-2 px-3 text-sm text-slate-400 hover:text-white"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
                     </div>
 
                     <div className="card p-6 bg-gradient-to-br from-blue-600/10 to-transparent border-blue-500/20">
