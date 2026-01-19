@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Play, Square, AlertCircle, Clock, Calendar, CheckCircle2, Plus } from 'lucide-react'
+import { Play, Square, AlertCircle, Clock, Calendar, CheckCircle2, Plus, Filter, X } from 'lucide-react'
 import { formatDuration } from '@/lib/utils'
 import ManualEntryModal from '@/components/ManualEntryModal'
 
@@ -19,6 +19,12 @@ export default function DashboardPage() {
 
     const [weeklyTotal, setWeeklyTotal] = useState('0.0')
     const [dailyTotal, setDailyTotal] = useState('0.0')
+    const [monthlyTotal, setMonthlyTotal] = useState('0.0')
+
+    // Filter State
+    const [startDate, setStartDate] = useState('')
+    const [endDate, setEndDate] = useState('')
+    const [filteredTotal, setFilteredTotal] = useState<string | null>(null)
 
     useEffect(() => {
         fetchData()
@@ -36,8 +42,13 @@ export default function DashboardPage() {
         weekStart.setDate(now.getDate() - daysSinceMonday)
         weekStart.setHours(0, 0, 0, 0)
 
+        // Calculate start of month
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+        monthStart.setHours(0, 0, 0, 0)
+
         let weeklyMs = 0
         let dailyMs = 0
+        let monthlyMs = 0
 
         entries.forEach(entry => {
             const start = new Date(entry.startTime).getTime()
@@ -51,10 +62,15 @@ export default function DashboardPage() {
             if (start >= todayStart.getTime()) {
                 dailyMs += duration
             }
+
+            if (start >= monthStart.getTime()) {
+                monthlyMs += duration
+            }
         })
 
         setWeeklyTotal((weeklyMs / (1000 * 60 * 60)).toFixed(1))
         setDailyTotal((dailyMs / (1000 * 60 * 60)).toFixed(1))
+        setMonthlyTotal((monthlyMs / (1000 * 60 * 60)).toFixed(1))
     }
 
     useEffect(() => {
@@ -71,25 +87,63 @@ export default function DashboardPage() {
         return () => clearInterval(interval)
     }, [activeEntry])
 
-    const fetchData = async () => {
+    const fetchData = async (customStart?: string, customEnd?: string) => {
         try {
             // Get user session info
             const sessionRes = await fetch('/api/auth/session')
             const sessionData = await sessionRes.json()
             setUser(sessionData.user)
 
+            // Prepare query
+            const query = new URLSearchParams()
+            if (customStart && customEnd) {
+                query.append('startDate', new Date(customStart).toISOString())
+                // Set end date to end of day
+                const eDate = new Date(customEnd)
+                eDate.setHours(23, 59, 59, 999)
+                query.append('endDate', eDate.toISOString())
+            }
+
             // Get active entries
-            const res = await fetch('/api/time')
+            const res = await fetch(`/api/time?${query.toString()}`)
             const entries = await res.json()
 
-            const active = entries.find((e: any) => !e.endTime)
-            setActiveEntry(active)
-            calculateStats(entries)
+            // If filtering, calculate total for this range
+            if (customStart && customEnd) {
+                let totalMs = 0
+                entries.forEach((entry: any) => {
+                    const start = new Date(entry.startTime).getTime()
+                    const end = entry.endTime ? new Date(entry.endTime).getTime() : new Date().getTime()
+                    totalMs += (end - start)
+                })
+                setFilteredTotal((totalMs / (1000 * 60 * 60)).toFixed(1))
+            } else {
+                // Normal Load: Update everything
+                const active = entries.find((e: any) => !e.endTime)
+                setActiveEntry(active)
+                calculateStats(entries)
+                setFilteredTotal(null)
+            }
+
             setLoading(false)
         } catch (err) {
             console.error(err)
             setLoading(false)
         }
+    }
+
+    const handleApplyFilter = () => {
+        if (!startDate || !endDate) return
+        setLoading(true)
+        fetchData(startDate, endDate)
+    }
+
+    const clearFilter = () => {
+        setStartDate('')
+        setEndDate('')
+        setFilteredTotal(null)
+        setLoading(true)
+        fetchData()
     }
 
     const handleClockIn = async () => {
@@ -178,14 +232,14 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Quick Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="card p-6 flex items-center gap-4">
                             <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
                                 <Clock className="w-6 h-6" />
                             </div>
                             <div>
-                                <p className="text-sm text-slate-400">Weekly Total</p>
-                                <p className="text-xl font-bold text-white">{weeklyTotal} hours</p>
+                                <p className="text-sm text-slate-400">Weekly</p>
+                                <p className="text-xl font-bold text-white">{weeklyTotal} h</p>
                             </div>
                         </div>
                         <div className="card p-6 flex items-center gap-4">
@@ -193,11 +247,39 @@ export default function DashboardPage() {
                                 <Calendar className="w-6 h-6" />
                             </div>
                             <div>
-                                <p className="text-sm text-slate-400">Daily Total</p>
-                                <p className="text-xl font-bold text-white">{dailyTotal} hours</p>
+                                <p className="text-sm text-slate-400">Daily</p>
+                                <p className="text-xl font-bold text-white">{dailyTotal} h</p>
+                            </div>
+                        </div>
+                        <div className="card p-6 flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400">
+                                <Calendar className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-slate-400">Monthly</p>
+                                <p className="text-xl font-bold text-white">{monthlyTotal} h</p>
                             </div>
                         </div>
                     </div>
+
+                    {/* Filter Result Card (Only shows when filtered) */}
+                    {filteredTotal !== null && (
+                        <div className="card p-6 bg-blue-500/10 border-blue-500/20 flex items-center justify-between animate-fade-in">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400">
+                                    <Filter className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-slate-400">Selected Range Total</p>
+                                    <p className="text-xs text-slate-500">{startDate} to {endDate}</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-3xl font-bold text-white">{filteredTotal}</p>
+                                <p className="text-xs text-slate-400">hours</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Sidebar / Info */}
@@ -210,6 +292,51 @@ export default function DashboardPage() {
                         <p className="text-sm text-slate-400 leading-relaxed">
                             {user?.currentTask || 'No task assigned yet. Please check back later or update your objectives.'}
                         </p>
+                    </div>
+
+                    {/* Filter Card */}
+                    <div className="card p-6">
+                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                            <Filter className="w-5 h-5 text-blue-400" />
+                            Analyze Hours
+                        </h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs text-slate-400 block mb-1">Start Date</label>
+                                <input
+                                    type="date"
+                                    className="input-field py-2 text-sm"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs text-slate-400 block mb-1">End Date</label>
+                                <input
+                                    type="date"
+                                    className="input-field py-2 text-sm"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <button
+                                    onClick={handleApplyFilter}
+                                    disabled={!startDate || !endDate}
+                                    className="flex-1 btn-primary py-2 text-sm disabled:opacity-50"
+                                >
+                                    Apply
+                                </button>
+                                {filteredTotal !== null && (
+                                    <button
+                                        onClick={clearFilter}
+                                        className="btn-outline py-2 px-3 text-sm text-slate-400 hover:text-white"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
                     <div className="card p-6 bg-gradient-to-br from-blue-600/10 to-transparent border-blue-500/20">
