@@ -12,7 +12,7 @@ export async function POST(req: Request) {
         // Check if there's already an active session
         const activeEntry = await prisma.timeEntry.findFirst({
             where: {
-                userId: session.userId,
+                userId: session.id,
                 endTime: null,
             },
         })
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
 
         const entry = await prisma.timeEntry.create({
             data: {
-                userId: session.userId,
+                userId: session.id,
                 startTime: new Date(),
             },
         })
@@ -48,7 +48,7 @@ export async function GET(req: Request) {
 
         const entries = await prisma.timeEntry.findMany({
             where: {
-                userId: session.userId,
+                userId: session.id,
                 ...(startDate && endDate ? {
                     startTime: {
                         gte: new Date(startDate),

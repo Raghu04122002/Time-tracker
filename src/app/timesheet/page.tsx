@@ -78,12 +78,15 @@ export default function TimesheetPage() {
             })
 
             if (res.ok) {
-                setLogs(logs.filter((log: any) => log.id !== id))
+                setLogs(prevLogs => prevLogs.filter((log: any) => log.id !== id))
             } else {
-                console.error('Failed to delete log')
+                const error = await res.text()
+                console.error('Failed to delete log:', error)
+                alert('Failed to delete log. Please try again.')
             }
         } catch (err) {
             console.error(err)
+            alert('An error occurred while deleting the log.')
         }
     }
 
