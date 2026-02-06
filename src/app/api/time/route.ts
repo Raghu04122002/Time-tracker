@@ -21,9 +21,16 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'You already have an active session' }, { status: 400 })
         }
 
+        // Get user's organization
+        const user = await prisma.user.findUnique({
+            where: { id: session.id },
+            select: { organizationId: true }
+        })
+
         const entry = await prisma.timeEntry.create({
             data: {
                 userId: session.id,
+                organizationId: user?.organizationId || null,
                 startTime: new Date(),
             },
         })

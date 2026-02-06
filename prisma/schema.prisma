@@ -3,36 +3,84 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-model User {
+model Organization {
   id          String      @id @default(cuid())
-  name        String
-  email       String      @unique
-  password    String
-  role        Role        @default(EMPLOYEE)
+  name        String      @unique
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-  currentTask String?
+  users       User[]
   timeEntries TimeEntry[]
+  tasks       Task[]
+}
+
+model User {
+  id             String        @id @default(cuid())
+  name           String
+  email          String        @unique
+  password       String
+  role           Role          @default(EMPLOYEE)
+  organizationId String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  currentTask    String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  timeEntries    TimeEntry[]
+  assignedTasks  Task[]        @relation("AssignedTasks")
+  receivedTasks  Task[]        @relation("ReceivedTasks")
+
+  @@index([organizationId])
 }
 
 model TimeEntry {
-  id          String    @id @default(cuid())
-  startTime   DateTime
-  endTime     DateTime?
-  description String?
-  isManual    Boolean   @default(false)
-  userId      String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id             String        @id @default(cuid())
+  startTime      DateTime
+  endTime        DateTime?
+  description    String?
+  isManual       Boolean       @default(false)
+  userId         String?
+  organizationId String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model Task {
+  id             String       @id @default(cuid())
+  title          String
+  description    String?
+  status         TaskStatus   @default(PENDING)
+  assignedById   String
+  assignedToId   String
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  dueDate        DateTime?
+  assignedBy     User         @relation("AssignedTasks", fields: [assignedById], references: [id], onDelete: Cascade)
+  assignedTo     User         @relation("ReceivedTasks", fields: [assignedToId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([assignedToId])
+  @@index([assignedById])
+  @@index([organizationId])
 }
 
 enum Role {
   MANAGER
   EMPLOYEE
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }

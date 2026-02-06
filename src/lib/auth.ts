@@ -25,6 +25,7 @@ export function verifyToken(token: string) {
 }
 
 export interface Session {
+    userId: string
     id: string
     email: string
     name: string

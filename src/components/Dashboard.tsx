@@ -11,6 +11,8 @@ export default function DashboardPage() {
     const [timer, setTimer] = useState(0)
     const [loading, setLoading] = useState(true)
     const [clocking, setClocking] = useState(false)
+    const [organization, setOrganization] = useState<any>(null)
+    const [tasks, setTasks] = useState<any[]>([])
 
     // Modals
     const [showClockOutModal, setShowClockOutModal] = useState(false)
@@ -128,10 +130,47 @@ export default function DashboardPage() {
                 setIsFiltered(false)
             }
 
+            // Fetch organization info
+            if (sessionData?.user?.id) {
+                const userRes = await fetch(`/api/user/${sessionData.user.id}`)
+                if (userRes.ok) {
+                    const userData = await userRes.json()
+                    if (userData.organization) {
+                        setOrganization(userData.organization)
+                    }
+                }
+            }
+
+            // Fetch employee tasks
+            const tasksRes = await fetch('/api/tasks')
+            if (tasksRes.ok) {
+                setTasks(await tasksRes.json())
+            }
+
             setLoading(false)
         } catch (err) {
             console.error(err)
             setLoading(false)
+        }
+    }
+
+    const handleUpdateTaskStatus = async (taskId: string, status: string) => {
+        try {
+            const res = await fetch(`/api/tasks/${taskId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            })
+
+            if (res.ok) {
+                // Refresh tasks
+                const tasksRes = await fetch('/api/tasks')
+                if (tasksRes.ok) {
+                    setTasks(await tasksRes.json())
+                }
+            }
+        } catch (error) {
+            console.error('Update task error:', error)
         }
     }
 
@@ -192,8 +231,18 @@ export default function DashboardPage() {
     return (
         <div className="flex-1 p-8 space-y-8 animate-fade-in max-w-7xl mx-auto w-full">
             <header>
-                <h1 className="text-3xl font-bold text-white mb-2">Welcome Back, {user?.name || 'User'}</h1>
-                <p className="text-slate-400">Track your work hours and manage your productivity.</p>
+                <div className="flex items-center gap-3 mb-2">
+                    <h1 className="text-3xl font-bold text-white">Welcome Back, {user?.name || 'User'}</h1>
+                    {organization && (
+                        <span className="px-4 py-1.5 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-300 text-sm font-semibold">
+                            {organization.name}
+                        </span>
+                    )}
+                </div>
+                <p className="text-slate-400">
+                    Track your work hours and manage your productivity
+                    {tasks.length > 0 && ` • ${tasks.length} active task${tasks.length !== 1 ? 's' : ''}`}
+                </p>
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -347,6 +396,62 @@ export default function DashboardPage() {
                         <p className="text-sm text-slate-400 leading-relaxed">
                             {user?.currentTask || 'No task assigned yet. Please check back later or update your objectives.'}
                         </p>
+                    </div>
+
+                    {/* My Tasks */}
+                    <div className="card p-6">
+                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                            My Tasks ({tasks.length})
+                        </h3>
+                        <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                            {tasks.length === 0 ? (
+                                <p className="text-sm text-slate-500 italic text-center py-4">No tasks assigned</p>
+                            ) : (
+                                tasks.map(task => (
+                                    <div key={task.id} className="p-4 rounded-lg bg-slate-900/50 border border-slate-700/50">
+                                        <h4 className="font-semibold text-white mb-1">{task.title}</h4>
+                                        {task.description && (
+                                            <p className="text-xs text-slate-400 mb-2">{task.description}</p>
+                                        )}
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${task.status === 'COMPLETED' ? 'bg-green-500/10 text-green-400' :
+                                                task.status === 'IN_PROGRESS' ? 'bg-blue-500/10 text-blue-400' :
+                                                    task.status === 'CANCELLED' ? 'bg-red-500/10 text-red-400' :
+                                                        'bg-slate-500/10 text-slate-400'
+                                                }`}>
+                                                {task.status.replace('_', ' ')}
+                                            </span>
+                                            {task.dueDate && (
+                                                <span className="text-xs text-slate-500">
+                                                    Due: {new Date(task.dueDate).toLocaleDateString()}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {task.status !== 'COMPLETED' && task.status !== 'CANCELLED' && (
+                                            <div className="flex gap-2">
+                                                {task.status === 'PENDING' && (
+                                                    <button
+                                                        onClick={() => handleUpdateTaskStatus(task.id, 'IN_PROGRESS')}
+                                                        className="text-xs px-3 py-1.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/30"
+                                                    >
+                                                        Start
+                                                    </button>
+                                                )}
+                                                {task.status === 'IN_PROGRESS' && (
+                                                    <button
+                                                        onClick={() => handleUpdateTaskStatus(task.id, 'COMPLETED')}
+                                                        className="text-xs px-3 py-1.5 rounded bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/30"
+                                                    >
+                                                        Complete
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
 
                     <div className="card p-6 bg-gradient-to-br from-blue-600/10 to-transparent border-blue-500/20">

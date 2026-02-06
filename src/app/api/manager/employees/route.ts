@@ -11,8 +11,21 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        // Get manager's organization
+        const manager = await prisma.user.findUnique({
+            where: { id: session.id },
+            select: { organizationId: true }
+        })
+
+        if (!manager?.organizationId) {
+            return NextResponse.json({ error: 'Manager has no organization' }, { status: 400 })
+        }
+
         const employees = await prisma.user.findMany({
-            where: { role: 'EMPLOYEE' },
+            where: {
+                role: 'EMPLOYEE',
+                organizationId: manager.organizationId  // Filter by organization
+            },
             select: {
                 id: true,
                 email: true,

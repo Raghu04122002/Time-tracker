@@ -9,12 +9,23 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
+        // Get manager's organization
+        const manager = await prisma.user.findUnique({
+            where: { id: session.id },
+            select: { organizationId: true }
+        })
+
+        if (!manager?.organizationId) {
+            return NextResponse.json({ error: 'Manager has no organization' }, { status: 400 })
+        }
+
         const { searchParams } = new URL(req.url)
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')
 
         const entries = await prisma.timeEntry.findMany({
             where: {
+                organizationId: manager.organizationId,  // Filter by organization
                 ...(startDate && endDate ? {
                     startTime: {
                         gte: new Date(startDate),

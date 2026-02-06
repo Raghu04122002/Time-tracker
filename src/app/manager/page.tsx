@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import LogTable from '@/components/LogTable'
-import { Download, Users, TrendingUp, Calendar, FileSpreadsheet, Trash2, Clock } from 'lucide-react'
+import { Download, Users, TrendingUp, Calendar, FileSpreadsheet, Trash2, Clock, X } from 'lucide-react'
 import { getCDTStartOfCurrentWeek, getCDTStartOfMonth } from '@/lib/utils'
 
 import Papa from 'papaparse'
@@ -15,6 +15,9 @@ export default function ManagerDashboard() {
     const [session, setSession] = useState<any>(null)
     const [employeeTasks, setEmployeeTasks] = useState<Record<string, string>>({})
     const [mounted, setMounted] = useState(false)
+    const [organization, setOrganization] = useState<any>(null)
+    const [tasks, setTasks] = useState<any[]>([])
+
 
     const [weeklyHours, setWeeklyHours] = useState('0.00')
     const [monthlyHours, setMonthlyHours] = useState('0.00')
@@ -64,8 +67,9 @@ export default function ManagerDashboard() {
     const fetchData = async () => {
         try {
             const sessionRes = await fetch('/api/auth/session')
+            let sessionData = null
             if (sessionRes.ok) {
-                const sessionData = await sessionRes.json()
+                sessionData = await sessionRes.json()
                 setSession(sessionData.user)
             }
 
@@ -82,6 +86,24 @@ export default function ManagerDashboard() {
                 if (Array.isArray(empData)) setEmployees(empData)
             } else {
                 console.error('MANAGER_DASHBOARD_EMPLOYEES_ERROR:', await empRes.text())
+            }
+
+            // Fetch organization info
+            if (sessionData?.user?.id) {
+                const userRes = await fetch(`/api/user/${sessionData.user.id}`)
+                if (userRes.ok) {
+                    const userData = await userRes.json()
+                    if (userData.organization) {
+                        setOrganization(userData.organization)
+                    }
+                }
+            }
+
+            // Fetch tasks
+            const tasksRes = await fetch('/api/tasks')
+            if (tasksRes.ok) {
+                const tasksData = await tasksRes.json()
+                setTasks(tasksData)
             }
 
             setLoading(false)
@@ -185,6 +207,46 @@ export default function ManagerDashboard() {
         document.body.removeChild(link)
     }
 
+
+
+    const handleUpdateTaskStatus = async (taskId: string, status: string) => {
+        try {
+            const res = await fetch(`/api/tasks/${taskId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            })
+
+            if (res.ok) {
+                // Refresh tasks
+                const tasksRes = await fetch('/api/tasks')
+                if (tasksRes.ok) {
+                    setTasks(await tasksRes.json())
+                }
+            }
+        } catch (error) {
+            console.error('Update task error:', error)
+        }
+    }
+
+    const handleDeleteNewTask = async (taskId: string) => {
+        try {
+            const res = await fetch(`/api/tasks/${taskId}`, {
+                method: 'DELETE'
+            })
+
+            if (res.ok) {
+                // Refresh tasks
+                const tasksRes = await fetch('/api/tasks')
+                if (tasksRes.ok) {
+                    setTasks(await tasksRes.json())
+                }
+            }
+        } catch (error) {
+            console.error('Delete task error:', error)
+        }
+    }
+
     if (!mounted || loading) return null
 
     return (
@@ -194,8 +256,18 @@ export default function ManagerDashboard() {
             <main className="max-w-7xl mx-auto p-8 animate-fade-in space-y-8">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-white mb-2">Manager Dashboard</h1>
-                        <p className="text-slate-400">Monitor team activity and export logs.</p>
+                        <div className="flex items-center gap-3 mb-2">
+                            <h1 className="text-3xl font-bold text-white">Manager Dashboard</h1>
+                            {organization && (
+                                <span className="px-4 py-1.5 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-300 text-sm font-semibold">
+                                    {organization.name}
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-slate-400">
+                            Monitor team activity and assign tasks
+                            {employees.length > 0 && ` • ${employees.length} employee${employees.length !== 1 ? 's' : ''} in your organization`}
+                        </p>
                     </div>
 
                     <button
@@ -243,6 +315,56 @@ export default function ManagerDashboard() {
                         <div>
                             <p className="text-sm text-slate-400">Total Hours</p>
                             <p className="text-xl font-bold text-white">{totalHours} h</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Task Assignment Panel */}
+                <div className="grid grid-cols-1 gap-6">
+                    {/* Active Tasks List */}
+                    <div className="card p-6">
+                        <h3 className="text-lg font-bold text-white mb-4">Active Tasks ({tasks.length})</h3>
+                        <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                            {tasks.length === 0 ? (
+                                <p className="text-slate-500 text-center py-8 italic">No tasks assigned yet</p>
+                            ) : (
+                                tasks.map(task => (
+                                    <div key={task.id} className="p-4 rounded-lg bg-slate-900/50 border border-slate-700/50">
+                                        <div className="flex items-start justify-between gap-3 mb-2">
+                                            <div className="flex-1">
+                                                <h4 className="font-semibold text-white">{task.title}</h4>
+                                                <p className="text-xs text-slate-400 mt-1">
+                                                    Assigned to: {task.assignedTo?.name}
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleDeleteNewTask(task.id)}
+                                                className="p-1.5 rounded text-slate-500 hover:text-red-400 hover:bg-red-400/10"
+                                                title="Delete task"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        {task.description && (
+                                            <p className="text-sm text-slate-400 mb-2">{task.description}</p>
+                                        )}
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${task.status === 'COMPLETED' ? 'bg-green-500/10 text-green-400' :
+                                                task.status === 'IN_PROGRESS' ? 'bg-blue-500/10 text-blue-400' :
+                                                    task.status === 'CANCELLED' ? 'bg-red-500/10 text-red-400' :
+                                                        'bg-slate-500/10 text-slate-400'
+                                                }`}>
+                                                {task.status.replace('_', ' ')}
+                                            </span>
+                                            {task.dueDate && (
+                                                <span className="text-xs text-slate-500">
+                                                    Due: {new Date(task.dueDate).toLocaleDateString()}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>

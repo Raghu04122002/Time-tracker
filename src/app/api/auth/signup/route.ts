@@ -4,9 +4,9 @@ import { hashPassword } from '@/lib/auth'
 
 export async function POST(req: Request) {
     try {
-        const { name, email, password, role } = await req.json()
+        const { name, email, password, role, organization } = await req.json()
 
-        if (!name || !email || !password || !role) {
+        if (!name || !email || !password || !role || !organization) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
 
@@ -20,12 +20,33 @@ export async function POST(req: Request) {
 
         const hashedPassword = await hashPassword(password)
 
+        // Normalize organization name (trim and proper case)
+        const normalizedOrgName = organization.trim()
+
+        // Find organization using case-insensitive search
+        let org = await prisma.organization.findFirst({
+            where: {
+                name: {
+                    equals: normalizedOrgName,
+                    mode: 'insensitive'
+                }
+            }
+        })
+
+        // If not found, create with the normalized name
+        if (!org) {
+            org = await prisma.organization.create({
+                data: { name: normalizedOrgName }
+            })
+        }
+
         const user = await prisma.user.create({
             data: {
                 name,
                 email,
                 password: hashedPassword,
                 role: role.toUpperCase(),
+                organizationId: org.id,
             },
         })
 
@@ -35,3 +56,4 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }
+

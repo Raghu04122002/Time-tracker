@@ -10,7 +10,8 @@ export default function Signup() {
         name: '',
         email: '',
         password: '',
-        role: 'EMPLOYEE'
+        role: 'EMPLOYEE',
+        organization: ''
     })
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
@@ -101,14 +102,30 @@ export default function Signup() {
                         </div>
 
                         <div>
+                            <label className="text-sm font-medium text-slate-300 mb-1.5 block">Organization</label>
+                            <div className="relative">
+                                <ShieldCheck className="absolute left-3 top-2.5 w-5 h-5 text-slate-500" />
+                                <input
+                                    type="text"
+                                    required
+                                    className="input-field pl-10"
+                                    placeholder="Your Company Name"
+                                    value={formData.organization}
+                                    onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
+                                />
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">Enter your organization name to join or create it</p>
+                        </div>
+
+                        <div>
                             <label className="text-sm font-medium text-slate-300 mb-1.5 block">Role</label>
                             <div className="grid grid-cols-2 gap-4">
                                 <button
                                     type="button"
                                     onClick={() => setFormData({ ...formData, role: 'EMPLOYEE' })}
                                     className={`p-3 rounded-xl border transition-all flex items-center justify-center gap-2 ${formData.role === 'EMPLOYEE'
-                                            ? 'border-blue-500 bg-blue-500/10 text-blue-400'
-                                            : 'border-slate-700 hover:border-slate-600 text-slate-400'
+                                        ? 'border-blue-500 bg-blue-500/10 text-blue-400'
+                                        : 'border-slate-700 hover:border-slate-600 text-slate-400'
                                         }`}
                                 >
                                     <User className="w-4 h-4" />
@@ -118,8 +135,8 @@ export default function Signup() {
                                     type="button"
                                     onClick={() => setFormData({ ...formData, role: 'MANAGER' })}
                                     className={`p-3 rounded-xl border transition-all flex items-center justify-center gap-2 ${formData.role === 'MANAGER'
-                                            ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
-                                            : 'border-slate-700 hover:border-slate-600 text-slate-400'
+                                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
+                                        : 'border-slate-700 hover:border-slate-600 text-slate-400'
                                         }`}
                                 >
                                     <ShieldCheck className="w-4 h-4" />
